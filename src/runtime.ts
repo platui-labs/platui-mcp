@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import {
   createAuthContextFromEnv,
   HttpApiClient,
@@ -13,6 +15,23 @@ import {
  */
 export const DEFAULT_API_BASE_URL = "https://timon.platui.com";
 export const DEFAULT_APP_BASE_URL = "https://chat.platui.com";
+
+/**
+ * This server's own version, read from the package.json that ships alongside
+ * dist/ in both the dev checkout and the published npm package. Sent to the
+ * backend as X-PlatUI-MCP-Version on every API call so outdated servers can
+ * be blocked (HTTP 426) or nudged (X-PlatUI-MCP-Notice) server-side.
+ */
+export function readOwnVersion(): string {
+  try {
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf-8"),
+    ) as { version?: string };
+    return packageJson.version || "0.0.0-unknown";
+  } catch {
+    return "0.0.0-unknown";
+  }
+}
 
 export interface RuntimeOptions {
   auth: AuthContext;
@@ -46,7 +65,10 @@ export function resolveRuntimeOptions(env: NodeJS.ProcessEnv): RuntimeOptions {
   }
 
   const apiClient = new LoginHintApiClient(
-    new HttpApiClient({ baseUrl: env.PLATUI_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL }),
+    new HttpApiClient({
+      baseUrl: env.PLATUI_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL,
+      clientVersion: readOwnVersion(),
+    }),
   );
 
   return {
