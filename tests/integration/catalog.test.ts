@@ -93,7 +93,7 @@ const publicToolCases: Array<{
   },
   {
     name: "platui_import_figma_plugin_payload",
-    args: { projectId: "project-1", payload: [{ frame: "Hero" }] },
+    args: { projectId: "project-1", screens: [[{ frame: "Hero" }], [{ frame: "Settings" }]] },
     method: "POST",
     path: "/plugin/publish/screen",
   },

@@ -131,7 +131,7 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
           imports: ["figma-url", "figma-mcp-context", "figma-plugin-payload"],
           execution: "Public tools call the PlatUI cloud API.",
           positioning:
-            "PlatUI converts Figma designs into code artifacts that are RAW MATERIAL for you, the agent: use them to build a full prototype (whole design -> app) or extract a single screen/component's generated code and adapt it into the user's codebase. Generated code is a structural mapping of the design JSON -- designs without Figma Auto Layout yield absolute positioning you should refactor. When output looks wrong, platui_inspect_design shows the design's true structure and the artifacts remain your base layout.",
+            "PlatUI converts Figma designs into code artifacts that are RAW MATERIAL for you, the agent: use them to build a full prototype (whole design -> app) or extract a single screen/component's generated code and adapt it into the user's codebase. Generated code is a structural mapping of the design JSON -- designs without Figma Auto Layout yield absolute positioning you should refactor. When output looks wrong, platui_inspect_design shows the design's true structure and the artifacts remain your base layout. Preserve generated visual values (sizes, colors, typography) when refactoring, and always download the referenced assets alongside the code.",
         });
       },
     },
@@ -310,7 +310,7 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     {
       name: "platui_import_figma",
       description:
-        "Start a BRAND-NEW PlatUI project from a Figma URL. This always creates a new project -- there is no update/overwrite path. BEFORE calling this: (1) call platui_list_projects and REUSE any existing project for this same Figma file (add screens with platui_import_figma_mcp_context / platui_import_figma_plugin_payload) instead of creating duplicates; (2) look at the design first -- platui_get_figma_screenshot and platui_parse_figma_url -- and SUGGEST a project name from the Figma file/frame name for the user to confirm; never pass a name the user hasn't agreed to. For multiple screens: one project, then one import per screen (each Figma URL carries a different node-id).",
+        "Start a BRAND-NEW PlatUI project from a Figma URL. This always creates a new project -- there is no update/overwrite path. BEFORE calling this: (1) call platui_list_projects and REUSE any existing project for this same Figma file (add screens with platui_import_figma_mcp_context / platui_import_figma_plugin_payload) instead of creating duplicates; (2) look at the design first -- platui_get_figma_screenshot and platui_parse_figma_url -- and SUGGEST a project name from the Figma file/frame name for the user to confirm; never pass a name the user hasn't agreed to. Multiple screens can be imported in ONE call: put comma-separated ids in the node-id param (e.g. ?node-id=1-2,3-4).",
       inputSchema: {
         type: "object",
         properties: {
@@ -424,24 +424,24 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     {
       name: "platui_import_figma_plugin_payload",
       description:
-        "Add screens to an EXISTING PlatUI project from a PlatUI Figma plugin/export payload. Requires the target project's id -- use platui_list_projects to find it, or platui_import_figma first if the user wants a new project.",
+        "Add one or MANY screens to an EXISTING PlatUI project in a single push. screens is an array where each entry is one screen's Figma node selection (an array of nodes). Requires the target project's id -- use platui_list_projects to find it, or platui_import_figma first if the user wants a new project.",
       inputSchema: {
         type: "object",
         properties: {
           projectId: { type: "string" },
-          payload: {
+          screens: {
             type: "array",
-            items: { type: "object" },
-            description: "Figma node selection payload array.",
+            items: { type: "array", items: { type: "object" } },
+            description: "One entry per screen; each entry is that screen's node selection array.",
           },
         },
-        required: ["projectId", "payload"],
+        required: ["projectId", "screens"],
         additionalProperties: false,
       },
       validator: z
         .object({
           projectId: z.string().min(1),
-          payload: z.array(z.record(z.any())),
+          screens: z.array(z.array(z.record(z.any()))).min(1),
         })
         .strict(),
       visibility: "public",
@@ -455,7 +455,7 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
           "/plugin/publish/screen",
           {
             project_id: args.projectId,
-            screen: [{ selection: args.payload }],
+            screen: args.screens.map((selection: Record<string, unknown>[]) => ({ selection })),
           },
           context.auth,
         );
@@ -525,7 +525,7 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     {
       name: "platui_generate_code",
       description:
-        "Compile Figma node JSON payload to code synchronously. Expectation: this is a structural mapping of the design JSON to framework code -- output quality mirrors design hygiene. Designs using Figma Auto Layout produce clean flex layouts; free-floating layers produce absolute positioning that YOU should refactor for responsiveness. If output looks wrong, call platui_inspect_design to see the design's true structure and treat the generated code as the base layout to improve, not a finished result.",
+        "Compile Figma node JSON payload to code synchronously. Expectation: this is a structural mapping of the design JSON to framework code -- output quality mirrors design hygiene. Designs using Figma Auto Layout produce clean flex layouts; free-floating layers produce absolute positioning that YOU should refactor for responsiveness. If output looks wrong, call platui_inspect_design to see the design's true structure and treat the generated code as the base layout to improve, not a finished result. When refactoring, PRESERVE the generated visual values (dimensions, colors, typography, spacing) -- they are the design's ground truth; restructure code, do not reinvent visuals.",
       inputSchema: {
         type: "object",
         properties: {
@@ -627,7 +627,7 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     {
       name: "platui_get_artifacts",
       description:
-        "List generated artifact files (paths + download URLs) for a project. To read a specific file's code, call platui_get_artifact_content instead of downloading URLs yourself.",
+        "List generated artifact files (paths + download URLs) for a project. To read a specific file's code, call platui_get_artifact_content. IMPORTANT: the listing also contains the design's ASSETS (images/vectors/fonts) that the code references -- download them too (platui_get_artifact_content returns their URLs) and place them at the paths the code expects, or the result will render broken.",
       inputSchema: projectIdSchema,
       validator: projectIdValidator,
       visibility: "public",

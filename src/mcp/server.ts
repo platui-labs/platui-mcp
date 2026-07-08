@@ -203,9 +203,9 @@ function renderGenerateFromFigmaPrompt(projectId?: string, figmaUrl?: string): s
 ${importStep}
 3. Call \`platui_generate_code\` for the selected target framework.
 4. Poll \`platui_check_job_status\` until the job completes.
-5. Read generated code with \`platui_get_artifacts\` + \`platui_get_artifact_content\`, then \`platui_create_preview\` / \`platui_get_preview\` for a hosted preview.
+5. Read generated code with \`platui_get_artifacts\` + \`platui_get_artifact_content\`, AND download the referenced assets (images/vectors/fonts) from the same listing to the paths the code expects. Then \`platui_create_preview\` / \`platui_get_preview\` for a hosted preview.
 
 Modes: for a FULL PROTOTYPE, repeat the import for every screen (same project, one node-id per screen) and assemble the app from all artifacts. For a SINGLE COMPONENT, import just that component's frame and adapt its generated code into the user's existing codebase.
 
-Expectations: generated code is a structural mapping of the design JSON -- your raw material, not a finished app. Designs without Figma Auto Layout yield absolute positioning: refactor it for responsiveness. If output looks wrong, \`platui_inspect_design\` shows the design's true structure; keep the artifacts as your base layout.`;
+Expectations: generated code is a structural mapping of the design JSON -- your raw material, not a finished app. Designs without Figma Auto Layout yield absolute positioning: refactor it for responsiveness. If output looks wrong, \`platui_inspect_design\` shows the design's true structure; keep the artifacts as your base layout, and preserve generated visual values (sizes, colors, typography) when you refactor.`;
 }
