@@ -12,7 +12,7 @@ import {
  * other environments and are documented in CONTRIBUTING.md, not the README.
  */
 export const DEFAULT_API_BASE_URL = "https://timon.platui.com";
-export const DEFAULT_APP_BASE_URL = "https://app.platui.com";
+export const DEFAULT_APP_BASE_URL = "https://chat.platui.com";
 
 export interface RuntimeOptions {
   auth: AuthContext;

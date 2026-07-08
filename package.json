@@ -1,6 +1,6 @@
 {
   "name": "@platui/mcp",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0-rc.3",
   "description": "Official MCP server for PlatUI - turn Figma designs into production React and Flutter code from your AI coding agent.",
   "main": "dist/cli.js",
   "type": "commonjs",

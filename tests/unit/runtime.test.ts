@@ -23,7 +23,7 @@ describe("resolveRuntimeOptions", () => {
 
     expect(DEFAULT_API_BASE_URL).toBe("https://timon.platui.com");
     expect(options.appBaseUrl).toBe(DEFAULT_APP_BASE_URL);
-    expect(options.appBaseUrl).toBe("https://app.platui.com");
+    expect(options.appBaseUrl).toBe("https://chat.platui.com");
     // Empty scopes would make the local registry reject 24 of the 27 tools
     // even after a successful login (the rc.1 defect).
     expect(options.auth.scopes).toEqual(["*"]);
