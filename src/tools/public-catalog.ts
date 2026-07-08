@@ -3,6 +3,7 @@ import {
   imageResult,
   jsonResult,
   parseFigmaUrl,
+  textResult,
   type ApiClient,
   type PlatuiToolDefinition,
   type ToolExecutionContext,
@@ -28,6 +29,7 @@ const publicToolNames = [
   "platui_create_preview",
   "platui_get_preview",
   "platui_get_artifacts",
+  "platui_get_artifact_content",
   "platui_check_job_status",
   "platui_add_project_member",
   "platui_remove_project_member",
@@ -63,6 +65,49 @@ const projectIdSchema = {
 
 const projectIdValidator = z.object({ projectId: z.string().min(1) }).strict();
 
+/** Inline cap for platui_get_artifact_content; larger files return their URL. */
+const MAX_INLINE_ARTIFACT_BYTES = 200_000;
+
+interface ArtifactFile {
+  path: string;
+  url: string;
+}
+
+/**
+ * Flattens the /workspace/files/path listing (whose exact nesting is
+ * backend-owned and varies) into path -> download-URL pairs by walking the
+ * JSON for string values that look like URLs.
+ */
+function collectArtifactUrls(listing: unknown, prefix = ""): ArtifactFile[] {
+  if (!listing || typeof listing !== "object") {
+    return [];
+  }
+  const files: ArtifactFile[] = [];
+  for (const [key, value] of Object.entries(listing as Record<string, unknown>)) {
+    const path = prefix ? `${prefix}/${key}` : key;
+    if (typeof value === "string" && value.startsWith("http")) {
+      files.push({ path, url: value });
+    } else if (value && typeof value === "object") {
+      files.push(...collectArtifactUrls(value, path));
+    }
+  }
+  return files;
+}
+
+/** Text artifacts come back inline; images/fonts/etc. return their URL. */
+function isBinaryArtifact(contentType: string, buffer: Buffer): boolean {
+  if (/^(text\/|application\/(json|javascript|xml))/.test(contentType)) {
+    return false;
+  }
+  if (
+    /^(image|video|audio|font)\//.test(contentType) ||
+    contentType === "application/octet-stream"
+  ) {
+    return true;
+  }
+  return buffer.subarray(0, 1024).includes(0);
+}
+
 /**
  * Builds the customer-safe public MCP tool catalog.
  */
@@ -85,6 +130,8 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
             "Framework/language support is backend-owned and changes over time -- call platui_get_available_frameworks and platui_get_available_languages for the current set.",
           imports: ["figma-url", "figma-mcp-context", "figma-plugin-payload"],
           execution: "Public tools call the PlatUI cloud API.",
+          positioning:
+            "PlatUI converts Figma designs into code artifacts that are RAW MATERIAL for you, the agent: use them to build a full prototype (whole design -> app) or extract a single screen/component's generated code and adapt it into the user's codebase. Generated code is a structural mapping of the design JSON -- designs without Figma Auto Layout yield absolute positioning you should refactor. When output looks wrong, platui_inspect_design shows the design's true structure and the artifacts remain your base layout.",
         });
       },
     },
@@ -152,7 +199,8 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     },
     {
       name: "platui_get_project_context",
-      description: "Return project metadata, framework, active designs, and status.",
+      description:
+        "Return project metadata, framework, active designs, and status. The genId field identifies the latest code generation -- pass it to platui_get_web_builder_logs / platui_get_web_builder_artifacts / platui_trigger_web_builder_deploy.",
       inputSchema: projectIdSchema,
       validator: projectIdValidator,
       visibility: "public",
@@ -173,7 +221,7 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     {
       name: "platui_list_projects",
       description:
-        "List the current user's projects. Use this to discover project ids before calling other project-scoped tools -- platui_import_figma is the only way to create one (there's no standalone create-empty-project tool).",
+        "List the current user's projects. ALWAYS check here before platui_import_figma: if a project already exists for the same Figma file, reuse it instead of creating a duplicate. Also the way to discover project ids for every other project-scoped tool.",
       inputSchema: emptyObjectSchema,
       validator: z.object({}).strict(),
       visibility: "public",
@@ -262,7 +310,7 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     {
       name: "platui_import_figma",
       description:
-        "Start a BRAND-NEW PlatUI project from a Figma URL (via the server-side Figma REST connector). This always creates a new project -- there is no update/overwrite path. Ask the user for a real project name before calling this; do not invent one. If the user wants to add this Figma design to a project they already have, use platui_import_figma_mcp_context or platui_import_figma_plugin_payload with that project's id instead of this tool.",
+        "Start a BRAND-NEW PlatUI project from a Figma URL. This always creates a new project -- there is no update/overwrite path. BEFORE calling this: (1) call platui_list_projects and REUSE any existing project for this same Figma file (add screens with platui_import_figma_mcp_context / platui_import_figma_plugin_payload) instead of creating duplicates; (2) look at the design first -- platui_get_figma_screenshot and platui_parse_figma_url -- and SUGGEST a project name from the Figma file/frame name for the user to confirm; never pass a name the user hasn't agreed to. For multiple screens: one project, then one import per screen (each Figma URL carries a different node-id).",
       inputSchema: {
         type: "object",
         properties: {
@@ -416,7 +464,8 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     },
     {
       name: "platui_inspect_design",
-      description: "Summarize screens, layers, components, fonts, assets, and routes.",
+      description:
+        "Summarize screens, layers, components, fonts, assets, and routes. Use this when generated code looks wrong: the node tree shows the design's true structure (including whether Auto Layout was used) so you can fix layout issues in the generated base code yourself.",
       inputSchema: projectIdSchema,
       validator: projectIdValidator,
       visibility: "public",
@@ -475,7 +524,8 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     },
     {
       name: "platui_generate_code",
-      description: "Compile Figma node JSON payload to code synchronously.",
+      description:
+        "Compile Figma node JSON payload to code synchronously. Expectation: this is a structural mapping of the design JSON to framework code -- output quality mirrors design hygiene. Designs using Figma Auto Layout produce clean flex layouts; free-floating layers produce absolute positioning that YOU should refactor for responsiveness. If output looks wrong, call platui_inspect_design to see the design's true structure and treat the generated code as the base layout to improve, not a finished result.",
       inputSchema: {
         type: "object",
         properties: {
@@ -576,7 +626,8 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     },
     {
       name: "platui_get_artifacts",
-      description: "Return generated file structures/paths from S3 storage.",
+      description:
+        "List generated artifact files (paths + download URLs) for a project. To read a specific file's code, call platui_get_artifact_content instead of downloading URLs yourself.",
       inputSchema: projectIdSchema,
       validator: projectIdValidator,
       visibility: "public",
@@ -592,6 +643,83 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
           context.auth,
         );
         return jsonResult("Project Artifact Files", response);
+      },
+    },
+    {
+      name: "platui_get_artifact_content",
+      description:
+        "Fetch one generated file's code as text, ready to write into the workspace with your own file tools -- no manual downloading. filePath is a path from platui_get_artifacts; a partial suffix match works (e.g. 'src/App.jsx'). Binary or oversized files return their download URL instead of inline content.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "PlatUI project id." },
+          filePath: {
+            type: "string",
+            description: "Artifact file path (or unique path suffix) from platui_get_artifacts.",
+          },
+        },
+        required: ["projectId", "filePath"],
+        additionalProperties: false,
+      },
+      validator: z
+        .object({
+          projectId: z.string().min(1),
+          filePath: z.string().min(1),
+        })
+        .strict(),
+      visibility: "public",
+      requiredScopes: ["artifact:read"],
+      riskLevel: "read",
+      executionPlane: "api",
+      async execute(args, context) {
+        const client = requireApiClient(context);
+        const listing = await client.request<unknown>(
+          "GET",
+          `/workspace/files/path/${encodeURIComponent(args.projectId)}`,
+          undefined,
+          context.auth,
+        );
+
+        const files = collectArtifactUrls(listing);
+        if (files.length === 0) {
+          throw new Error(
+            "No artifact files found for this project. Generation may have failed or not run yet -- check platui_check_job_status.",
+          );
+        }
+
+        const match =
+          files.find((file) => file.path === args.filePath) ??
+          files.find((file) => file.path.endsWith(args.filePath));
+        if (!match) {
+          throw new Error(
+            `No artifact matches "${args.filePath}". Available files:\n${files
+              .map((file) => file.path)
+              .join("\n")}`,
+          );
+        }
+
+        const response = await fetch(match.url);
+        if (!response.ok) {
+          throw new Error(
+            `Downloading "${match.path}" failed with ${response.status}. The URL may have expired -- call platui_get_artifacts again for a fresh listing.`,
+          );
+        }
+
+        const contentType = response.headers.get("content-type") ?? "";
+        const buffer = Buffer.from(await response.arrayBuffer());
+        if (isBinaryArtifact(contentType, buffer) || buffer.length > MAX_INLINE_ARTIFACT_BYTES) {
+          return jsonResult(`Artifact: ${match.path}`, {
+            path: match.path,
+            inline: false,
+            reason:
+              buffer.length > MAX_INLINE_ARTIFACT_BYTES
+                ? `File is ${buffer.length} bytes (inline cap ${MAX_INLINE_ARTIFACT_BYTES}).`
+                : `Content type "${contentType}" is not text.`,
+            downloadUrl: match.url,
+          });
+        }
+
+        return textResult(`// ${match.path}\n${buffer.toString("utf-8")}`);
       },
     },
     {

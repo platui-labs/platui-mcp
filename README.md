@@ -38,6 +38,10 @@ Then sign in from your agent — no tokens to copy:
 
 Call `platui_get_capabilities` for the full tool catalog.
 
+## How to think about this
+
+PlatUI converts Figma designs into code **artifacts for your agent to build with** — not a finished app. Two ways to use it: convert a whole design into a project (import every screen into one project, generate, assemble), or extract one screen/component's generated code and let the agent adapt it into your existing codebase. Output quality mirrors design hygiene: Figma Auto Layout produces clean flex layouts, free-floating layers produce absolute positioning the agent should refactor. When generated code looks off, `platui_inspect_design` exposes the design's true structure and the artifacts remain the base to improve on.
+
 ## Configuration
 
 None. The server ships pointed at PlatUI production and signs you in through the browser — there are no tokens to create and no environment variables to set.

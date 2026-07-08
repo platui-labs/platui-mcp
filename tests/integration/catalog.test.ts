@@ -180,7 +180,7 @@ const publicToolCases: Array<{
 ];
 
 describe("catalog integration", () => {
-  it("has the expected 27 public tools", () => {
+  it("has the expected 28 public tools", () => {
     const publicNames = buildPublicTools().map((tool) => tool.name);
 
     // 27 tools: platui_refactor_code and platui_export_project_zip were
@@ -189,7 +189,8 @@ describe("catalog integration", () => {
     // frameworks/languages discovery, a Figma screenshot tool, project
     // collaboration (add/remove/list members), the web-builder deploy
     // pipeline (trigger/logs/artifacts), and read-only user state/plan.
-    expect(publicNames).toHaveLength(27);
+    expect(publicNames).toHaveLength(28);
+    expect(publicNames).toContain("platui_get_artifact_content");
     expect(publicNames).toContain("platui_get_capabilities");
     expect(publicNames).toContain("platui_login");
     expect(publicNames).toContain("platui_check_login");
