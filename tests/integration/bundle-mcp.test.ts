@@ -33,12 +33,12 @@ afterEach(async () => {
 });
 
 describe("bundled stdio MCP server (dist/cli.js)", () => {
-  it("lists the 27 public tools and calls local public tools", async () => {
+  it("lists the 28 public tools and calls local public tools", async () => {
     const client = await connect();
     const tools = await client.listTools();
     const toolNames = tools.tools.map((tool) => tool.name);
 
-    expect(toolNames).toHaveLength(27);
+    expect(toolNames).toHaveLength(28);
     expect(toolNames).toContain("platui_get_capabilities");
     expect(toolNames).toContain("platui_parse_figma_url");
     expect(toolNames).toContain("platui_import_figma");

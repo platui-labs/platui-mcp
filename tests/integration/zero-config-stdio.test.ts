@@ -37,7 +37,7 @@ describe("zero-config customer environment", () => {
     clients.push(client);
 
     const tools = await client.listTools();
-    expect(tools.tools).toHaveLength(27);
+    expect(tools.tools).toHaveLength(28);
 
     // A scope-gated local tool must work without any scopes env var --
     // this exact call failed with "Missing required scope(s)" in rc.1.
