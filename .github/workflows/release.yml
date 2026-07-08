@@ -1,0 +1,68 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+  # Required for npm trusted publishing (OIDC) -- no npm token is stored anywhere.
+  id-token: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platui-mcp
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: platui-mcp
+      # CORE_SSH_KEY: read-only deploy key registered on platui-labs/platui-mcp-core,
+      # stored as an Actions secret here. Grants checkout access to that repo only.
+      # (The default GITHUB_TOKEN cannot read other private repos.)
+      - uses: actions/checkout@v4
+        with:
+          repository: platui-labs/platui-mcp-core
+          ref: main
+          ssh-key: ${{ secrets.CORE_SSH_KEY }}
+          path: platui-mcp-core
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Build platui-mcp-core (file:../platui-mcp-core dependency)
+        working-directory: platui-mcp-core
+        run: |
+          npm ci
+          npm run build
+      - run: npm ci
+      - run: npm run verify
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+      # Publishing uses npm TRUSTED PUBLISHING (OIDC): no token, no secret.
+      # Prerequisites, one-time, on npmjs.com under the @platui/mcp package:
+      #   Settings -> Trusted Publisher -> GitHub Actions ->
+      #   org platui-labs, repository platui-mcp, workflow release.yml.
+      # The step is skipped while package.json has "private": true; flip it to
+      # false when ready to go live. npm >= 11.5.1 is required for OIDC.
+      - name: Publish to npm (guarded, trusted publishing)
+        run: |
+          if [ "$(node -p 'require("./package.json").private === true')" = "true" ]; then
+            echo "::notice title=npm publish skipped::package.json still has \"private\": true. Flip it to false when ready to go live."
+            exit 0
+          fi
+          # npm publishes package.json's version, not the git tag -- refuse a mismatch.
+          PKG_VERSION="$(node -p 'require("./package.json").version')"
+          if [ "$GITHUB_REF_NAME" != "v$PKG_VERSION" ]; then
+            echo "::error title=tag/version mismatch::Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+          npm install -g npm@latest
+          # Prerelease versions (e.g. v1.0.0-rc.1) publish under the "next"
+          # dist-tag so `npx @platui/mcp` (latest) never resolves to them.
+          # Test prereleases with `npx @platui/mcp@next`.
+          case "$GITHUB_REF_NAME" in
+            *-*) npm publish --tag next ;;
+            *)   npm publish ;;
+          esac

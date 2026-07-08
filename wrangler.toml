@@ -1,0 +1,29 @@
+name = "platui-mcp-public"
+main = "src/worker.ts"
+compatibility_date = "2024-03-20"
+
+# PLATUI_PUBLIC_API_BASE_URL values below are verified against real DNS/CloudFront
+# (see docs/endpoint-map.md). PLATUI_JWKS_URL/ISSUER/AUDIENCE are still placeholders:
+# no OAuth/JWKS issuer has been stood up yet (Phase 3 in docs/plan.md) — do not
+# treat those three as verified.
+[vars]
+PLATUI_PUBLIC_API_BASE_URL = "https://timon.sandbox.platui.com"
+PLATUI_JWKS_URL = "https://auth-sandbox.platui.com/.well-known/jwks.json"
+PLATUI_ISSUER = "https://auth-sandbox.platui.com"
+PLATUI_AUDIENCE = "https://mcp-sandbox.platui.com/mcp"
+
+[env.sandbox]
+name = "platui-mcp-public-sandbox"
+[env.sandbox.vars]
+PLATUI_PUBLIC_API_BASE_URL = "https://timon.sandbox.platui.com"
+PLATUI_JWKS_URL = "https://auth-sandbox.platui.com/.well-known/jwks.json"
+PLATUI_ISSUER = "https://auth-sandbox.platui.com"
+PLATUI_AUDIENCE = "https://mcp-sandbox.platui.com/mcp"
+
+[env.production]
+name = "platui-mcp-public-prod"
+[env.production.vars]
+PLATUI_PUBLIC_API_BASE_URL = "https://timon.platui.com"
+PLATUI_JWKS_URL = "https://auth.platui.com/.well-known/jwks.json"
+PLATUI_ISSUER = "https://auth.platui.com"
+PLATUI_AUDIENCE = "https://mcp.platui.com/mcp"

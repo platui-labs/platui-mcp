@@ -1,0 +1,5 @@
+# Default owners for everything in this repo.
+# Enforcement activates once "Require review from Code Owners" is enabled on the
+# main branch protection rule and the @platui-labs/platui-mcp-team team exists
+# with write access; until then this file is informational.
+* @platui-labs/platui-mcp-team

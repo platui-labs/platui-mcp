@@ -1,0 +1,75 @@
+{
+  "name": "@platui/mcp",
+  "version": "1.0.0-rc.2",
+  "description": "Official MCP server for PlatUI - turn Figma designs into production React and Flutter code from your AI coding agent.",
+  "main": "dist/cli.js",
+  "type": "commonjs",
+  "bin": {
+    "platui-mcp": "dist/cli.js"
+  },
+  "files": [
+    "dist/cli.js"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "bundle": "esbuild src/index.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/cli.js --banner:js='#!/usr/bin/env node'",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "start:sandbox": "PLATUI_PUBLIC_API_BASE_URL=https://timon.sandbox.platui.com node dist/index.js",
+    "start:prod": "PLATUI_PUBLIC_API_BASE_URL=https://timon.platui.com node dist/index.js",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "npm run lint && npm run format:check && npm run build && npm run bundle && npm run test && npm run coverage",
+    "prepublishOnly": "npm run verify"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@modelcontextprotocol/sdk": "^1.0.1",
+    "@types/node": "^20.11.24",
+    "@vitest/coverage-v8": "^4.1.8",
+    "esbuild": "^0.28.1",
+    "eslint": "^9.39.4",
+    "platui-mcp-core": "file:../platui-mcp-core",
+    "prettier": "^3.9.4",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.63.0",
+    "vitest": "^4.1.8"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "figma",
+    "design-to-code",
+    "codegen",
+    "react",
+    "flutter",
+    "ui-generation",
+    "platui",
+    "claude",
+    "cursor",
+    "ai-agent"
+  ],
+  "homepage": "https://platui.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/platui-labs/platui-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/platui-labs/platui-mcp/issues"
+  },
+  "author": "PlatUI",
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,8 @@
+dist
+coverage
+node_modules
+package-lock.json
+package.json
+sandbox
+# Dormant Cloudflare Worker path -- intentionally left untouched until it is revived.
+src/worker.ts
