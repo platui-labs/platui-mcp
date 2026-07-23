@@ -14,8 +14,16 @@ import {
   DEFAULT_API_BASE_URL,
   DEFAULT_APP_BASE_URL,
   LoginHintApiClient,
+  readOwnVersion,
   resolveRuntimeOptions,
 } from "../../src/runtime";
+import packageJson from "../../package.json";
+
+describe("readOwnVersion", () => {
+  it("reports the package.json version, which the API client sends as X-PlatUI-MCP-Version", () => {
+    expect(readOwnVersion()).toBe(packageJson.version);
+  });
+});
 
 describe("resolveRuntimeOptions", () => {
   it("gives a zero-config customer production endpoints and full local scopes", () => {
