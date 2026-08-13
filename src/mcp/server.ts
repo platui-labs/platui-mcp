@@ -15,6 +15,7 @@ import { z } from "zod";
 import { AuthorizationError, errorResult, ToolRegistry } from "platui-mcp-core";
 import type { ApiClient, AuthContext } from "platui-mcp-core";
 import { buildPublicTools } from "../tools/public-catalog";
+import { readOwnVersion } from "../runtime";
 
 export interface PlatuiMcpServerOptions {
   auth: AuthContext;
@@ -98,6 +99,7 @@ function registerToolHandlers(
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+    let outcome: "success" | "error" = "success";
 
     try {
       const result = await registry.call(name, args, {
@@ -108,6 +110,7 @@ function registerToolHandlers(
       });
       return result as any;
     } catch (error) {
+      outcome = "error";
       if (error instanceof z.ZodError) {
         throw new McpError(
           ErrorCode.InvalidParams,
@@ -121,8 +124,45 @@ function registerToolHandlers(
         throw new McpError(ErrorCode.MethodNotFound, error.message);
       }
       return errorResult(error instanceof Error ? error.message : String(error)) as any;
+    } finally {
+      void trackToolUsage(name, outcome);
     }
   });
+}
+
+/**
+ * Fire-and-forget usage telemetry to Mixpanel's ingestion API. Must never
+ * throw, block tool execution, or leak anything sensitive. The Mixpanel
+ * project token is public by design (same model as the Figma plugin);
+ * tracking is skipped entirely when no token is configured.
+ */
+async function trackToolUsage(tool: string, outcome: "success" | "error"): Promise<void> {
+  try {
+    const token = process.env.PLATUI_MIXPANEL_TOKEN;
+    if (!token) {
+      return;
+    }
+    await fetch("https://api.mixpanel.com/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([
+        {
+          event: "MCP Tool Invoked",
+          properties: {
+            token,
+            distinct_id: process.env.PLATUI_MIXPANEL_DISTINCT_ID ?? "anonymous",
+            time: Date.now(),
+            $insert_id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            Tool: tool,
+            Outcome: outcome,
+            Version: readOwnVersion(),
+          },
+        },
+      ]),
+    });
+  } catch {
+    // Intentional: telemetry must never break the MCP server.
+  }
 }
 
 function registerResourceHandlers(server: Server): void {
