@@ -486,7 +486,10 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
       validator: z
         .object({
           projectId: z.string().min(1),
-          screens: z.array(z.array(z.record(z.any()))).min(1).optional(),
+          screens: z
+            .array(z.array(z.record(z.any())))
+            .min(1)
+            .optional(),
           payload: z.array(z.record(z.any())).min(1).optional(),
         })
         .refine((data) => data.screens !== undefined || data.payload !== undefined, {
@@ -498,8 +501,9 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
       executionPlane: "api",
       async execute(args, context) {
         const client = requireApiClient(context);
-        const screens = (args as { screens?: Record<string, unknown>[][]; payload?: Record<string, unknown>[] }).screens ?? 
-          ((args as { payload?: Record<string, unknown>[] }).payload ? [(args as { payload: Record<string, unknown>[] }).payload] : []);
+        const screens = (
+          args as { screens?: Record<string, unknown>[][]; payload?: Record<string, unknown>[] }
+        ).screens ?? [(args as { payload: Record<string, unknown>[] }).payload];
         const response = await client.request(
           "POST",
           "/plugin/publish/screen",
