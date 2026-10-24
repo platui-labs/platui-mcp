@@ -160,4 +160,23 @@ describe("platui_get_artifact_content", () => {
       /failed with 403[\s\S]*platui_get_artifacts again/,
     );
   });
+
+  it("rejects ambiguous suffix matches with matching candidates", async () => {
+    const ambiguousListing = {
+      data: {
+        "src/App.jsx": "https://s3.example.com/app1.jsx",
+        "lib/App.jsx": "https://s3.example.com/app2.jsx",
+      },
+    };
+    await expect(call(ambiguousListing, { projectId: "p1", filePath: "App.jsx" })).rejects.toThrow(
+      /Ambiguous artifact suffix "App.jsx"/,
+    );
+  });
+
+  it("treats application/pdf artifacts as binary even without NUL bytes", async () => {
+    stubFetch("PDF header text without nul byte", { contentType: "application/pdf" });
+    const result = await call(listing, { projectId: "p1", filePath: "App.jsx" });
+    const text = result.content[0].type === "text" ? result.content[0].text : "";
+    expect(text).toContain('"inline": false');
+  });
 });

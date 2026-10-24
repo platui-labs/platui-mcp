@@ -96,12 +96,15 @@ function collectArtifactUrls(listing: unknown, prefix = ""): ArtifactFile[] {
 
 /** Text artifacts come back inline; images/fonts/etc. return their URL. */
 function isBinaryArtifact(contentType: string, buffer: Buffer): boolean {
-  if (/^(text\/|application\/(json|javascript|xml))/.test(contentType)) {
+  if (/^(text\/|application\/(json|javascript|xml|x-javascript|ecmascript))/.test(contentType)) {
     return false;
   }
   if (
     /^(image|video|audio|font)\//.test(contentType) ||
-    contentType === "application/octet-stream"
+    contentType === "application/pdf" ||
+    contentType === "application/octet-stream" ||
+    contentType === "application/zip" ||
+    contentType === "application/gzip"
   ) {
     return true;
   }
@@ -111,11 +114,46 @@ function isBinaryArtifact(contentType: string, buffer: Buffer): boolean {
 /**
  * Builds the customer-safe public MCP tool catalog.
  */
+export const EXTERNAL_AGENT_GUIDANCE = {
+  supportedAgents: ["Cursor", "Claude Code", "Antigravity"],
+  s3AssetCaching:
+    "Artifact listings from platui_get_artifacts return short-lived S3 presigned URLs, and background Sharp/S3 asset extraction (mabel) can lag behind code generation by several minutes. External agents (Cursor, Claude Code, Antigravity) MUST cache downloaded binary assets locally at the exact relative paths referenced by generated components instead of hotlinking presigned S3 URLs, and re-poll platui_get_artifacts if assets{} is initially empty or if a presigned URL returns HTTP 403.",
+  figma429RateLimiting:
+    "platui_import_figma and platui_get_figma_screenshot share the connected Figma OAuth rate-limit bucket. To avoid Figma HTTP 429 errors: (1) always call platui_list_projects first to reuse an existing project for the same Figma fileKey; (2) batch multiple frames in a single platui_import_figma call using comma-separated node-ids (?node-id=1-2,3-4); (3) on HTTP 429, apply exponential backoff (wait 60-180s) rather than retrying in a tight loop.",
+} as const;
+
+export const RAZORPAY_MCP_PROJECT_METADATA = {
+  remoteMcpServerUrl: "https://mcp.razorpay.com/mcp",
+  dockerImage: "razorpay/mcp",
+  recommendedTools: [
+    "detect_stack",
+    "integrate_razorpay_checkout",
+    "create_order",
+    "create_payment_link_upi",
+    "create_qr_code",
+    "fetch_settlement_recon_details",
+  ],
+  bharatSaasKitConventions: {
+    currency: "INR",
+    checkoutScriptUrl: "https://checkout.razorpay.com/v1/checkout.js",
+    webhookSignatureHeader: "x-razorpay-signature",
+    webhookHashAlgorithm: "HMAC-SHA256",
+    features: [
+      "UPI AutoPay & recurring subscription mandates",
+      "18% GST tax invoicing (CGST 9% + SGST 9% or IGST 18%) with GSTIN capture",
+      "+91 10-digit Indian mobile validation and en-IN currency formatting",
+    ],
+  },
+  workflow:
+    "After importing a Figma design with platui_import_figma and pulling code via platui_get_artifact_content, pair with the Razorpay MCP server (https://mcp.razorpay.com/mcp) to run detect_stack and integrate_razorpay_checkout, wiring Checkout.js + server-side order creation + HMAC-SHA256 webhook verification into the generated PlatUI screens.",
+} as const;
+
 export function buildPublicTools(): PlatuiToolDefinition[] {
   return [
     {
       name: "platui_get_capabilities",
-      description: "Return supported PlatUI MCP targets, tool names, and deployment boundaries.",
+      description:
+        "Return supported PlatUI MCP targets, tool names, deployment boundaries, external agent guidance (Cursor, Claude Code, Antigravity) for S3 asset caching and Figma 429 rate-limiting, and Razorpay MCP project creation metadata.",
       inputSchema: emptyObjectSchema,
       validator: z.object({}).strict(),
       visibility: "public",
@@ -132,6 +170,8 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
           execution: "Public tools call the PlatUI cloud API.",
           positioning:
             "PlatUI converts Figma designs into code artifacts that are RAW MATERIAL for you, the agent: use them to build a full prototype (whole design -> app) or extract a single screen/component's generated code and adapt it into the user's codebase. Generated code is a structural mapping of the design JSON -- designs without Figma Auto Layout yield absolute positioning you should refactor. When output looks wrong, platui_inspect_design shows the design's true structure and the artifacts remain your base layout. Preserve generated visual values (sizes, colors, typography) when refactoring, and always download the referenced assets alongside the code.",
+          agentGuidance: EXTERNAL_AGENT_GUIDANCE,
+          razorpayMcpIntegration: RAZORPAY_MCP_PROJECT_METADATA,
         });
       },
     },
@@ -310,7 +350,7 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     {
       name: "platui_import_figma",
       description:
-        "Start a BRAND-NEW PlatUI project from a Figma URL. This always creates a new project -- there is no update/overwrite path. BEFORE calling this: (1) call platui_list_projects and REUSE any existing project for this same Figma file (add screens with platui_import_figma_mcp_context / platui_import_figma_plugin_payload) instead of creating duplicates; (2) look at the design first -- platui_get_figma_screenshot and platui_parse_figma_url -- and SUGGEST a project name from the Figma file/frame name for the user to confirm; never pass a name the user hasn't agreed to. Multiple screens can be imported in ONE call: put comma-separated ids in the node-id param (e.g. ?node-id=1-2,3-4).",
+        "Start a BRAND-NEW PlatUI project from a Figma URL. This always creates a new project -- there is no update/overwrite path. BEFORE calling this: (1) call platui_list_projects and REUSE any existing project for this same Figma file (add screens with platui_import_figma_mcp_context / platui_import_figma_plugin_payload) instead of creating duplicates; (2) look at the design first -- platui_get_figma_screenshot and platui_parse_figma_url -- and SUGGEST a project name from the Figma file/frame name for the user to confirm; never pass a name the user hasn't agreed to. Multiple screens can be imported in ONE call: put comma-separated ids in the node-id param (e.g. ?node-id=1-2,3-4) to avoid Figma 429 rate-limiting. For payment-enabled apps, combine the generated project with Razorpay MCP (see razorpayMcpIntegration in platui_get_capabilities).",
       inputSchema: {
         type: "object",
         properties: {
@@ -424,7 +464,7 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     {
       name: "platui_import_figma_plugin_payload",
       description:
-        "Add one or MANY screens to an EXISTING PlatUI project in a single push. screens is an array where each entry is one screen's Figma node selection (an array of nodes). Requires the target project's id -- use platui_list_projects to find it, or platui_import_figma first if the user wants a new project.",
+        "Add one or MANY screens to an EXISTING PlatUI project in a single push. screens is an array where each entry is one screen's Figma node selection (an array of nodes). Alternatively, payload is accepted as a compatible single-screen selection array. Requires the target project's id -- use platui_list_projects to find it, or platui_import_figma first if the user wants a new project.",
       inputSchema: {
         type: "object",
         properties: {
@@ -434,28 +474,42 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
             items: { type: "array", items: { type: "object" } },
             description: "One entry per screen; each entry is that screen's node selection array.",
           },
+          payload: {
+            type: "array",
+            items: { type: "object" },
+            description: "Compatible single-screen alias: an array of Figma nodes for one screen.",
+          },
         },
-        required: ["projectId", "screens"],
+        required: ["projectId"],
         additionalProperties: false,
       },
       validator: z
         .object({
           projectId: z.string().min(1),
-          screens: z.array(z.array(z.record(z.any()))).min(1),
+          screens: z
+            .array(z.array(z.record(z.any())))
+            .min(1)
+            .optional(),
+          payload: z.array(z.record(z.any())).min(1).optional(),
         })
-        .strict(),
+        .refine((data) => data.screens !== undefined || data.payload !== undefined, {
+          message: "Either 'screens' or 'payload' must be provided",
+        }),
       visibility: "public",
       requiredScopes: ["design:import"],
       riskLevel: "write",
       executionPlane: "api",
       async execute(args, context) {
         const client = requireApiClient(context);
+        const screens = (
+          args as { screens?: Record<string, unknown>[][]; payload?: Record<string, unknown>[] }
+        ).screens ?? [(args as { payload: Record<string, unknown>[] }).payload];
         const response = await client.request(
           "POST",
           "/plugin/publish/screen",
           {
             project_id: args.projectId,
-            screen: args.screens.map((selection: Record<string, unknown>[]) => ({ selection })),
+            screen: screens.map((selection: Record<string, unknown>[]) => ({ selection })),
           },
           context.auth,
         );
@@ -486,7 +540,7 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     {
       name: "platui_get_figma_screenshot",
       description:
-        "Render a Figma frame/node to an image via PlatUI's server-side Figma connector (uses the Figma account connected in the PlatUI web app). figmaUrl must include a node-id query param, same as platui_import_figma.",
+        "Render a Figma frame/node to an image via PlatUI's server-side Figma connector (uses the Figma account connected in the PlatUI web app). figmaUrl must include a node-id query param, same as platui_import_figma. Great for LOOKING at a design before importing (suggest a name, confirm scope with the user). Agent rate-limit guidance (Cursor, Claude Code, Antigravity): if this fails with a Figma 429, both screenshots and platui_import_figma share the same Figma rate-limit bucket -- back off for 60-180s instead of hammering.",
       inputSchema: {
         type: "object",
         properties: {
@@ -627,7 +681,7 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     {
       name: "platui_get_artifacts",
       description:
-        "List generated artifact files (paths + download URLs) for a project. To read a specific file's code, call platui_get_artifact_content. IMPORTANT: the listing also contains the design's ASSETS (images/vectors/fonts) that the code references -- download them too (platui_get_artifact_content returns their URLs) and place them at the paths the code expects, or the result will render broken.",
+        "List generated artifact files (paths + S3 presigned download URLs) for a project. To read a specific file's code, call platui_get_artifact_content. External agent guidance (Cursor, Claude Code, Antigravity): (1) the listing contains the design's ASSETS (images/vectors/fonts) that the code references -- download and cache them locally at the exact paths the code expects, never hotlink expiring S3 presigned URLs; (2) S3 asset extraction runs asynchronously in the background AFTER code generation and can lag by several minutes -- if assets{} is empty or missing files shortly after generation succeeded, wait and re-poll platui_get_artifacts before concluding assets don't exist.",
       inputSchema: projectIdSchema,
       validator: projectIdValidator,
       visibility: "public",
@@ -648,7 +702,7 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
     {
       name: "platui_get_artifact_content",
       description:
-        "Fetch one generated file's code as text, ready to write into the workspace with your own file tools -- no manual downloading. filePath is a path from platui_get_artifacts; a partial suffix match works (e.g. 'src/App.jsx'). Binary or oversized files return their download URL instead of inline content.",
+        "Fetch one generated file's code as text, ready to write into the workspace with your own file tools -- no manual downloading. filePath is a path from platui_get_artifacts; a partial suffix match works (e.g. 'src/App.jsx'). Binary or oversized files return their S3 presigned download URL instead of inline content (cache binary assets locally before the presigned URL expires; if HTTP 403 occurs, call platui_get_artifacts for fresh S3 URLs).",
       inputSchema: {
         type: "object",
         properties: {
@@ -687,9 +741,21 @@ export function buildPublicTools(): PlatuiToolDefinition[] {
           );
         }
 
-        const match =
-          files.find((file) => file.path === args.filePath) ??
-          files.find((file) => file.path.endsWith(args.filePath));
+        const exactMatch = files.find((file) => file.path === args.filePath);
+        let match = exactMatch;
+        if (!match) {
+          const suffixMatches = files.filter(
+            (file) => file.path.endsWith("/" + args.filePath) || file.path.endsWith(args.filePath),
+          );
+          if (suffixMatches.length > 1) {
+            throw new Error(
+              `Ambiguous artifact suffix "${args.filePath}". Matches multiple files:\n${suffixMatches
+                .map((file) => file.path)
+                .join("\n")}\nPlease provide the exact path.`,
+            );
+          }
+          match = suffixMatches[0];
+        }
         if (!match) {
           throw new Error(
             `No artifact matches "${args.filePath}". Available files:\n${files

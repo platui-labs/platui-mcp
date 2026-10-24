@@ -619,6 +619,32 @@ describe("catalog integration", () => {
     expect(sessionAuth.accessToken).toBe("eyJ.fake.jwt");
   });
 
+  it("supports platui_import_figma_plugin_payload with compatible single-screen payload alias", async () => {
+    const registry = new ToolRegistry("public", buildPublicTools());
+    const client = new RecordingApiClient();
+    const result = await registry.call(
+      "platui_import_figma_plugin_payload",
+      { projectId: "p1", payload: [{ frame: "SingleScreen" }] },
+      { profile: "public", auth, apiClient: client },
+    );
+    expect(result.content[0].type === "text" ? result.content[0].text : "").toContain(
+      "Figma Plugin Payload Imported",
+    );
+    expect(client.calls[0].path).toBe("/plugin/publish/screen");
+  });
+
+  it("rejects platui_import_figma_plugin_payload when neither screens nor payload is provided", async () => {
+    const registry = new ToolRegistry("public", buildPublicTools());
+    const client = new RecordingApiClient();
+    await expect(
+      registry.call("platui_import_figma_plugin_payload", { projectId: "p1" } as any, {
+        profile: "public",
+        auth,
+        apiClient: client,
+      }),
+    ).rejects.toThrow();
+  });
+
   it("creates the public MCP server runtime", () => {
     const publicRuntime = createPlatuiMcpServer({ auth, apiClient: new RecordingApiClient() });
 
