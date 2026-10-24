@@ -1,12 +1,14 @@
 [config]
-model = "openrouter/deepseek/deepseek-v4.1-flash"
+model = "openrouter/deepseek/deepseek-chat"
 fallback_models = [
-  "openrouter/deepseek/deepseek-chat",
-  "openrouter/google/gemini-2.5-flash",
-  "openrouter/anthropic/claude-3.5-sonnet"
+  "openrouter/deepseek/deepseek-v4.1-flash"
 ]
+reasoning_effort = "xhigh"
 custom_model_max_tokens = 32000
 ai_timeout = 180
+
+[openrouter]
+reasoning = { effort = "xhigh" }
 
 [pr_reviewer]
 require_focused_review = true
