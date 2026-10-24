@@ -8,7 +8,7 @@ on:
 
 jobs:
   pr_agent_job:
-    if: ${{ github.event.sender.type != 'Bot' && (github.event_name == 'pull_request' || github.event.issue.pull_request) }}
+    if: ${{ github.event.sender.type != 'Bot' && (github.event_name == 'pull_request' || (github.event.issue.pull_request && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))) }}
     runs-on: ubuntu-latest
     permissions:
       issues: write
