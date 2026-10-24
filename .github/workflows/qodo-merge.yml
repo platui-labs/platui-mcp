@@ -36,13 +36,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.OPENROUTER_KEY }}
-          CONFIG.MODEL: "openrouter/deepseek/deepseek-chat"
-          CONFIG.FALLBACK_MODELS: '["openrouter/deepseek/deepseek-v4.1-flash"]'
+          CONFIG.MODEL: "openrouter/deepseek/deepseek-v4.1-flash"
+          CONFIG.FALLBACK_MODELS: '[]'
           CONFIG.REASONING_EFFORT: "xhigh"
           CONFIG.CUSTOM_MODEL_MAX_TOKENS: 32000
+          CONFIG.OUTPUT_RUN_DETAILS: "true"
+          CONFIG.OUTPUT_RUN_COST: "true"
           OPENROUTER.REASONING.EFFORT: "xhigh"
           GITHUB_ACTION.PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
           GITHUB_ACTION_CONFIG.PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
           GITHUB_ACTION.AUTO_REVIEW: "true"
           GITHUB_ACTION.AUTO_DESCRIBE: "true"
-          GITHUB_ACTION.AUTO_IMPROVE: "false"
+          GITHUB_ACTION.AUTO_IMPROVE: "true"
