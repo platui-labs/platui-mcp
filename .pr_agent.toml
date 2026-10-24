@@ -10,6 +10,12 @@ ai_timeout = 180
 [openrouter]
 reasoning = { effort = "xhigh" }
 
+[github_action_config]
+pr_actions = ["opened", "reopened", "ready_for_review", "synchronize"]
+auto_review = true
+auto_describe = true
+auto_improve = false
+
 [pr_reviewer]
 require_focused_review = true
 require_score_review = true

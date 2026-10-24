@@ -41,6 +41,8 @@ jobs:
           CONFIG.REASONING_EFFORT: "xhigh"
           CONFIG.CUSTOM_MODEL_MAX_TOKENS: 32000
           OPENROUTER.REASONING.EFFORT: "xhigh"
+          GITHUB_ACTION.PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
+          GITHUB_ACTION_CONFIG.PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
           GITHUB_ACTION.AUTO_REVIEW: "true"
           GITHUB_ACTION.AUTO_DESCRIBE: "true"
           GITHUB_ACTION.AUTO_IMPROVE: "false"
