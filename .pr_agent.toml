@@ -1,5 +1,5 @@
 [config]
-model = "openrouter/deepseek/deepseek-v4.1-flash"
+model = "openrouter/deepseek/deepseek-flash-latest"
 fallback_models = []
 reasoning_effort = "xhigh"
 custom_model_max_tokens = 32000
