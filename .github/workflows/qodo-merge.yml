@@ -1,0 +1,50 @@
+name: Qodo Merge (PR-Agent)
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+  issue_comment:
+    types: [created]
+
+jobs:
+  pr_agent_job:
+    if: ${{ github.event.sender.type != 'Bot' && (github.event_name == 'pull_request' || (github.event.issue.pull_request && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))) }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # Node 24 support
+
+      - name: Verify OpenRouter Key
+        id: check_key
+        env:
+          KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.OPENROUTER_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "has_key=false" >> $GITHUB_OUTPUT
+            echo "::warning::OPENROUTER_API_KEY secret is not yet configured in this repository. Skipping PR-Agent review."
+          else
+            echo "has_key=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Qodo Merge (PR-Agent)
+        if: steps.check_key.outputs.has_key == 'true'
+        uses: qodo-ai/pr-agent@ab90e6e8545ea4d983a35ad0bfdc295c49727e24 # main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.OPENROUTER_KEY }}
+          CONFIG.MODEL: "openrouter/deepseek/deepseek-chat"
+          CONFIG.FALLBACK_MODELS: '["openrouter/google/gemini-2.5-flash"]'
+          CONFIG.REASONING_EFFORT: "xhigh"
+          CONFIG.CUSTOM_MODEL_MAX_TOKENS: 32000
+          CONFIG.OUTPUT_RUN_DETAILS: "true"
+          CONFIG.OUTPUT_RUN_COST: "true"
+          OPENROUTER.REASONING.EFFORT: "xhigh"
+          GITHUB_ACTION.PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
+          GITHUB_ACTION_CONFIG.PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
+          GITHUB_ACTION.AUTO_REVIEW: "true"
+          GITHUB_ACTION.AUTO_DESCRIBE: "true"
+          GITHUB_ACTION.AUTO_IMPROVE: "true"

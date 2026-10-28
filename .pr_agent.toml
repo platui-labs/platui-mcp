@@ -1,0 +1,45 @@
+[config]
+model = "openrouter/deepseek/deepseek-chat"
+fallback_models = []
+reasoning_effort = "xhigh"
+custom_model_max_tokens = 32000
+ai_timeout = 180
+output_run_details = true
+output_run_cost = true
+
+[openrouter]
+reasoning = { effort = "xhigh" }
+
+[github_action_config]
+pr_actions = ["opened", "reopened", "ready_for_review", "synchronize"]
+auto_review = true
+auto_describe = true
+auto_improve = true
+
+[pr_reviewer]
+require_focused_review = true
+require_score_review = true
+enable_review_labels_effort = true
+num_code_suggestions = 5
+persistent_comment = true
+extra_instructions = """
+Deliver high-depth review comparable to top AI reviewers (CodeRabbit / Codex):
+1. Provide a comprehensive summary of functional and architectural changes.
+2. Generate a Mermaid sequence or architecture diagram where appropriate to visualize code flow.
+3. Categorize modified files clearly by layer (e.g. Core Engine, UI/Components, API Routes, Config).
+4. Highlight critical security, performance, reliability, and edge-case implications.
+5. Provide actionable inline code suggestions with diff blocks where improvements are possible.
+"""
+
+[pr_description]
+publish_description_as_comment = true
+add_custom_labels = true
+inline_file_summary = true
+enable_pr_type = true
+generate_ai_title = true
+extra_instructions = """
+Format the description with high clarity:
+- Provide a summary table of changes grouped by component.
+- Include a Mermaid diagram illustrating the end-to-end data or component flow.
+- Add an estimated review effort and walkthrough checklist.
+"""
