@@ -36,8 +36,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.OPENROUTER_KEY }}
-          CONFIG.MODEL: "openrouter/deepseek/deepseek-flash-latest"
-          CONFIG.FALLBACK_MODELS: '[]'
+          CONFIG.MODEL: "openrouter/deepseek/deepseek-chat"
+          CONFIG.FALLBACK_MODELS: '["openrouter/google/gemini-2.5-flash"]'
           CONFIG.REASONING_EFFORT: "xhigh"
           CONFIG.CUSTOM_MODEL_MAX_TOKENS: 32000
           CONFIG.OUTPUT_RUN_DETAILS: "true"
